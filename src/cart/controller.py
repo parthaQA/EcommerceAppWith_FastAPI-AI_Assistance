@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, Request
-from src.cart.dtos import CartResponseSchema, CartItemSchema, ProductResponseSchema, CartProductsResponseSchema, CartProductSchema
-from src.cart.models import CartModel, CartItemModel
+from src.cart.dtos import CartResponseSchema, CartItemSchema, DeliveryAddressSchema, ProductResponseSchema, CartProductsResponseSchema, CartProductSchema
+from src.cart.models import CartModel, CartItemModel, DeliveryAddressModel
 from src.utils.helper import Helper
 from src.customers.controller import CustomerController
 from src.customers.models import CustomerModel
@@ -131,4 +131,41 @@ class CartController:
         }
 
 
-       
+    @staticmethod
+    def add_delivery_address(request: Request, cart_id: str, body: DeliveryAddressSchema, db: Session):
+        
+        customer_authenticated = CustomerController.is_authenticated(request)
+
+        if customer_authenticated["message"] != "Authenticated":
+            return {
+                "success": False,
+                "data": [],
+                "message": "Customer not authenticated"
+            }
+        
+        is_cart_exists = db.query(CartModel).filter(CartModel.cart_id== cart_id).first()
+        if not is_cart_exists:
+            raise HTTPException(status_code=404, detail= "cart id not found")
+
+        if not (560001 <= body.pincode <= 560114):
+            raise HTTPException(
+            status_code=400,
+            detail="Delivery is available only for pincodes between 560001 and 560114"
+        )
+
+
+        delivery_address = DeliveryAddressModel(
+            cart_id=cart_id,
+            address=body.address,
+            pincode=body.pincode,
+            city=body.city,
+        )
+        db.add(delivery_address)
+        db.commit()
+        db.refresh(delivery_address)
+
+        return {
+            "success": True,
+            "data": delivery_address,
+            "message": "Delivery address added successfully"
+        }   

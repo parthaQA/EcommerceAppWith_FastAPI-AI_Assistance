@@ -45,3 +45,10 @@ class CartProductsResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+
+class DeliveryAddressSchema(BaseModel):
+    address: str = Field(..., strict=True)
+    pincode: int = Field(..., strict=True)
+    city: str = Field(..., strict=True)
+
+    model_config = ConfigDict(from_attributes=True)

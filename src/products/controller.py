@@ -8,6 +8,7 @@ from src.utils.redis import  redis_client
 from src.category.models import CategoryModel
 from src.products.dtos import ProductResponseSchema
 from src.products.models import ProductModel
+from src.utils.rabbitmq import RabbitMQ
 
 
 class ProductController:
@@ -76,60 +77,127 @@ class ProductController:
 
         )
 
+    
+
     @staticmethod
-    def add_bulk_products_by_csv(category_id, file, db):
-        category = db.query(CategoryModel).filter(CategoryModel.id == category_id).first()
+    async def add_bulk_products_by_csv(category_id: int, file, db):
+
+        # Validate Category
+        category = (
+            db.query(CategoryModel)
+            .filter(CategoryModel.id == category_id)
+            .first()
+        )
+
         if not category:
-            raise HTTPException(status_code=400, detail="Category does not exist")
+            raise HTTPException(
+                status_code=400,
+                detail="Category does not exist"
+            )
 
-
+        # Validate File
         if not file.filename.endswith(".csv"):
-            raise HTTPException(status_code=400, detail="File must be a CSV file")
+            raise HTTPException(
+                status_code=400,
+                detail="File must be a CSV file"
+            )
 
-        contents = file.file.read().decode("utf-8")
-        csv_reader = csv.DictReader(StringIO(contents))
-        products_to_add = []
+        try:
+            contents = file.file.read().decode("utf-8")
+
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to read CSV file"
+            )
+
+        csv_reader = csv.DictReader(
+            StringIO(contents)
+        )
+
         errors = []
+        success_count = 0
 
         for idx, row in enumerate(csv_reader, start=1):
+
             try:
-                name = row.get("product_name")
-                price = float(row.get("product_price"))
-                product_description = row.get("product_description")
-                quantity = int(row.get("product_quantity"))
 
-                is_prod_exist = db.query(ProductModel).filter(ProductModel.product_name == name).first()
-
-                if is_prod_exist:
-                    raise ValueError("Product name already exists")
-
-                if price <= 0 or quantity <= 0:
-                    raise ValueError("Price or quantity cannot be 0")
-
-                product = ProductModel(
-                    product_name=name,
-                    product_price=price,
-                    product_quantity=quantity,
-                    product_description=product_description,
-                    category_id = category_id
+                product_name = (
+                    row.get("product_name", "")
+                    .strip()
                 )
 
-                products_to_add.append(product)
+                if not product_name:
+                    raise ValueError(
+                        "Product name is required"
+                    )
+
+                # Price Validation
+                try:
+                    price = float(
+                        row.get("product_price")
+                    )
+
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        "Invalid product price"
+                    )
+
+                # Quantity Validation
+                try:
+                    quantity = int(
+                        row.get("product_quantity")
+                    )
+
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        "Invalid product quantity"
+                    )
+
+                if price <= 0:
+                    raise ValueError(
+                        "Price cannot be 0 or negative"
+                    )
+
+                if quantity <= 0:
+                    raise ValueError(
+                        "Quantity cannot be 0 or negative"
+                    )
+
+                product_description = (
+                    row.get(
+                        "product_description",
+                        ""
+                    ).strip()
+                )
+
+                # Publish to RabbitMQ
+                await RabbitMQ.publish({
+                    "product_name": product_name,
+                    "product_price": price,
+                    "product_quantity": quantity,
+                    "product_description": product_description,
+                    "category_id": category_id
+                })
+
+                success_count += 1
 
             except Exception as e:
+
                 errors.append({
                     "row": idx,
-                    "product_name": row.get("product_name"),
+                    "product_name": row.get(
+                        "product_name"
+                    ),
                     "error": str(e)
                 })
 
-        if products_to_add:
-            db.bulk_save_objects(products_to_add)
-            db.commit()
-
         return {
             "success": True,
-            "inserted_count": len(products_to_add),
+            "message": (
+                "Products queued successfully"
+            ),
+            "queued_count": success_count,
             "failed_count": len(errors),
             "errors": errors
         }

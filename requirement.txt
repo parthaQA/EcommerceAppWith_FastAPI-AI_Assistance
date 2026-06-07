@@ -5,4 +5,5 @@ SQLAlchemy
 redis
 pytest
 pytest-mock
+aio-pika
 ##fastapi dev main.py --reload

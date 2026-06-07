@@ -27,7 +27,7 @@ class CartModel(BASE):
 class CartItemModel(BASE):
     __tablename__ = "cart_items"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, autoincrement=True, nullable=False, primary_key=True, unique=True)
     cart_id = Column(String, ForeignKey("cart.cart_id"))
     product_id = Column(Integer, ForeignKey("products.product_id"))
     quantity = Column(Integer, default=1)
@@ -36,4 +36,18 @@ class CartItemModel(BASE):
     modified_date = Column(DateTime, default=datetime.utcnow,
                            onupdate=datetime.utcnow)
 
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeliveryAddressModel(BASE):
+    __tablename__ = "delivery_address"
+    id = Column(Integer, primary_key=True, unique=True, autoincrement=True, nullable=False)
+    cart_id = Column(String, ForeignKey("cart.cart_id"))
+    address = Column(String, nullable=False)
+    pincode = Column(String, nullable=False)
+    city = Column(String, nullable=False)
+    created_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    modified_date = Column(DateTime, default=datetime.utcnow,
+                           onupdate=datetime.utcnow)
+                           
     model_config = ConfigDict(from_attributes=True)

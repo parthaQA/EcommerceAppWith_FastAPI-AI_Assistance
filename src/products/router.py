@@ -10,10 +10,6 @@ from typing import Annotated
 product_routes=APIRouter(prefix="/products")
 
 
-# @product_routes.post("/add", response_model=ProductResponseSchema, status_code=status.HTTP_201_CREATED)
-# def add_product(body:ProductSchema, db: Session= Depends(get_db)):
-#     return ProductController.add_product(body=body, db=db)
-
 
 @product_routes.post("/{category_id}/add", response_model=ProductResponseSchema, status_code=status.HTTP_201_CREATED)
 def add_product_by_category_id(category_id: int, body: ProductSchema, db: Session= Depends(get_db)):
@@ -22,8 +18,8 @@ def add_product_by_category_id(category_id: int, body: ProductSchema, db: Sessio
 
 
 @product_routes.post("/{category_id}/bulk-add", status_code=status.HTTP_201_CREATED)
-def add_product_by_category_id(category_id: int, file : UploadFile = File(...), db: Session= Depends(get_db)):
-    return ProductController.add_bulk_products_by_csv(
+async def add_product_in_bulk(category_id: int, file : UploadFile = File(...), db: Session= Depends(get_db)):
+    return await ProductController.add_bulk_products_by_csv(
         category_id= category_id, file=file,db= db)
 
 @product_routes.get("/all", status_code=status.HTTP_200_OK)
