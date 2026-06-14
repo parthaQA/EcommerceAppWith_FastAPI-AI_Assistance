@@ -104,8 +104,13 @@ class CustomerController:
                 mobile=body.mobile
             )
 
-        access_token = jwt.encode({"mobile": is_number_exist.mobile, "exp":exp_time},
-                           settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        access_token = jwt.encode(
+            {"customer_id": is_customer_exist.id,
+             "mobile": is_number_exist.mobile,
+             "exp":exp_time},
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM)
+
         decode_token = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         print("decoded token", decode_token)
 
@@ -127,9 +132,16 @@ class CustomerController:
     @staticmethod
     def is_authenticated(request: Request):
         auth_header = request.headers.get("Authorization")
+        customer_id = request.headers.get("customer_id")
 
         if not auth_header:
             raise HTTPException(status_code=401, detail="Missing token")
+
+        if not customer_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Missing customer_id header"
+            )
 
         try:
             token = auth_header.split(" ")[1]
@@ -140,8 +152,17 @@ class CustomerController:
                 algorithms=[settings.ALGORITHM]
             )
 
+            token_customer_id = str(payload.get("customer_id"))
+
+            if token_customer_id != str(customer_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Customer ID and token mismatch"
+                )
+
             return {
                 "message": "Authenticated",
+                "customer_id": token_customer_id,
                 "mobile": payload.get("mobile")
             }
 

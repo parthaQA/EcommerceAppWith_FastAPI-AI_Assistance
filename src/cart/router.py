@@ -10,9 +10,9 @@ cart_routes = APIRouter(prefix="/cart")
 
 
 @cart_routes.get(path="/get", status_code=status.HTTP_200_OK, summary="Get a new cart")
-def get_cart(request: Request, customer_id: Annotated[str, Query(...)], location: Annotated[str, Query(...)],db: Session = Depends(get_db)):
+def get_cart(request: Request, location: Annotated[str, Query(...)], db: Session = Depends(get_db)):
    
-    return CartController.get_cart(request,customer_id,location, db)
+    return CartController.get_cart(request,location, db)
 
 
 @cart_routes.post(path="/{cart_id}/products/add", status_code=status.HTTP_201_CREATED, summary="Add a product to the cart")

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, status, Request
+from typing import Annotated
+from fastapi import APIRouter, Depends, status, Request, Query
 from src.order.controller import OrderController
 from src.order.dtos import OrderSchema
 from src.utils.db import get_db
@@ -12,6 +13,8 @@ def create_customer(request: Request, body: OrderSchema, db: Session=Depends(get
     return OrderController().create_order(request, body, db)
 
 
-# @order_routes.get(path="/all", response_model=List[CustomerResponseSchema], status_code=status.HTTP_200_OK, summary="Get all customers")
-# def get_all_customers(db: Session=Depends(get_db)):
-#     return CustomerController().get_all_customers(db)
+@order_routes.get(path="/order-details", status_code=status.HTTP_200_OK, summary="Get order details by order id")
+def get_order_details_by_order_id(request: Request, order_id: Annotated[str, Query(...)], db: Session=Depends(get_db)):
+    return OrderController().get_order_details_by_order_id(request, order_id, db)
+
+

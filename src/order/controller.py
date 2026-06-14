@@ -93,3 +93,42 @@ class OrderController:
 
 
 
+    @staticmethod
+    def get_order_details_by_order_id(request: Request, order_id: str, db: Session):
+        customer_authenticated = CustomerController.is_authenticated(request)
+
+        if customer_authenticated["message"] != "Authenticated":
+            return {
+                "success": False,
+                "data": [],
+                "message": "Customer not authenticated"
+            }
+
+        order = (
+            db.query(OrderModel)
+            .filter(OrderModel.id == order_id)
+            .first()
+        )
+
+        if not order:
+            raise HTTPException(
+                status_code=404,
+                detail="Order not found"
+            )
+
+        order_items = (
+            db.query(OrderItemModel)
+            .filter(OrderItemModel.order_id == order_id)
+            .all()
+        )
+
+        return {
+            "success": True,
+            "data": {
+                "order": order,
+                "order_items": order_items
+            },
+            "message": "Order details retrieved successfully"
+        }
+
+
