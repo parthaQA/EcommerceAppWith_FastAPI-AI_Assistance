@@ -6,4 +6,10 @@ redis
 pytest
 pytest-mock
 aio-pika
+langchain-ollama
+langgraph
+langchain
+langchain-core
+langchain-community
+ipython
 ##fastapi dev main.py --reload

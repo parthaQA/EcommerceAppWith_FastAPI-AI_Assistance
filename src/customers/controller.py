@@ -58,76 +58,100 @@ class CustomerController:
         db.refresh(customer_registration_data)
         return customer_registration_data
 
+    async def customer_login_internal(
+            self,
+            body: CustomerLoginSchema,
+            db: Session
+    ):
 
-    async def customer_login(self, body: CustomerLoginSchema, db: Session, request: Request):
+        is_customer_exist = (
+            db.query(CustomerModel)
+            .filter(CustomerModel.mobile == body.mobile)
+            .first()
+        )
 
-        await Helper.check_rate_limit(request=request, mobile=body.mobile)
-
-        is_customer_exist = (db.query(CustomerModel)
-                             .filter(CustomerModel.mobile == body.mobile)
-                             .first())
         if not is_customer_exist:
-
-            await Helper.increment_login_attempt(
-            request=request,
-            mobile=body.mobile
+            raise HTTPException(
+                status_code=404,
+                detail="Customer not found"
             )
-            raise HTTPException(status_code=404, detail="Customer not found")
 
-        is_number_exist = (db.query(CustomerRegistrationModel)
-                           .filter(CustomerRegistrationModel.mobile == body.mobile)
-                           .first())
+        is_number_exist = (
+            db.query(CustomerRegistrationModel)
+            .filter(CustomerRegistrationModel.mobile == body.mobile)
+            .first()
+        )
 
         if not is_number_exist:
-
-            await Helper.increment_login_attempt(
-            request=request,
-            mobile=body.mobile
+            raise HTTPException(
+                status_code=401,
+                detail="Unauthorized"
             )
 
-            raise HTTPException(status_code=401, detail="unauthorized access number or password is wrong")
-        print(is_number_exist.password)
-
-        if not Helper.verify_password(body.password, is_number_exist.password):
-
-            await Helper.increment_login_attempt(
-            request=request,
-            mobile=body.mobile
-                )
-
-            raise HTTPException(status_code=401, detail="unauthorized access because of wrong password")
-
-        exp_time = datetime.now(timezone.utc) + timedelta(minutes=settings.EXP_TIME)
-
-        await Helper.clear_login_attempt(
-                    request=request,
-                mobile=body.mobile
+        if not Helper.verify_password(
+                body.password,
+                is_number_exist.password
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Wrong password"
             )
+
+        exp_time = datetime.now(
+            timezone.utc
+        ) + timedelta(
+            minutes=settings.EXP_TIME
+        )
 
         access_token = jwt.encode(
-            {"customer_id": is_customer_exist.id,
-             "mobile": is_number_exist.mobile,
-             "exp":exp_time},
+            {
+                "customer_id": is_customer_exist.id,
+                "mobile": is_number_exist.mobile,
+                "exp": exp_time
+            },
             settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM)
-
-        decode_token = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        print("decoded token", decode_token)
-
-        #generate new refresh token
-        refresh_token = str(uuid.uuid4())
-        hashed_token = Helper.generate_hashed_password(refresh_token)
-        refresh_entry = RefreshTokenModel(
-            mobile=is_number_exist.mobile,
-            token=hashed_token
+            algorithm=settings.ALGORITHM
         )
-        db.add(refresh_entry)
-        db.commit()
+
+        refresh_token = str(uuid.uuid4())
 
         return {
+            "customer_id": is_customer_exist.id,
+            "mobile": is_number_exist.mobile,
             "access_token": access_token,
             "refresh_token": refresh_token
         }
+
+
+    async def customer_login(self, body: CustomerLoginSchema, db: Session, request: Request):
+
+        await Helper.check_rate_limit(
+            request=request,
+            mobile=body.mobile
+        )
+
+        try:
+
+            response = await self.customer_login_internal(
+                body=body,
+                db=db
+            )
+
+            await Helper.clear_login_attempt(
+                request=request,
+                mobile=body.mobile
+            )
+
+            return response
+
+        except Exception:
+
+            await Helper.increment_login_attempt(
+                request=request,
+                mobile=body.mobile
+            )
+
+            raise
 
     @staticmethod
     def is_authenticated(request: Request):

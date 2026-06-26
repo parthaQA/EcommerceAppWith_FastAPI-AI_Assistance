@@ -3,6 +3,9 @@ import json
 from io import StringIO
 
 from fastapi import HTTPException
+
+from src.customers.controller import CustomerController
+from src.customers.models import CustomerModel
 from src.utils.redis import  redis_client
 
 from src.category.models import CategoryModel
@@ -254,3 +257,19 @@ class ProductController:
 
         return get_by_id
 
+
+
+    @staticmethod
+    def search_product_by_name(name, db):
+        """when user searches for a product by name, this function will return all products that match the search term"""
+        search_results = (
+        db.query(ProductModel)
+        .filter(ProductModel.product_name.ilike(f"%{name}%"))
+        .all()
+        )
+        print("search result with name", search_results)
+        return {
+        "success": True,
+        "data": search_results,
+        "message": f"Found {len(search_results)} products matching '{name}'"
+        }

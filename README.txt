@@ -1,7 +1,8 @@
-Technical Design Document (TDD): Fast_API Ecommerce Backend
+Technical Design Document (TDD): Fast_API Ecommerce Backend + Agentic AI
 
 1) Purpose
-This document describes the architecture, modules, data models, APIs, configuration, and runtime behavior of the Fast_API backend application and also has unit testing in place to test the logic.
+This document describes the architecture, modules, data models, APIs, configuration, and runtime behavior of the Fast_API backend application
+and it is Integrated the fast api with an ReAct (Reasoning + Acting) AI-powered Assistant using LangGraph, LangChain, and Ollama
 
 2) Scope
 In scope
@@ -13,8 +14,48 @@ In scope
 - Caching via Redis (async)
 - RabbitMQ for bulk product upload (async)
 - Startup/shutdown behavior
+- Integrated the fast api with an AI-powered Assistant using LangGraph, LangChain, and Ollama
+- The workflow follows the ReAct (Reasoning + Acting) pattern, where the LLM decides whether it needs to call a tool before responding.
 
+Architecture
+                    User Query
+                        │
+                        ▼
+                Initial State
+                        │
+                        ▼
+                 LangGraph Agent
+                        │
+            ┌───────────┴───────────┐
+            │                       │
+     Tool Required?             Final Answer
+            │
+           Yes
+            │
+            ▼
+      Product Search Tool
+            │
+            ▼
+      Product Database/API
+            │
+            ▼
+      Tool Response
+            │
+            ▼
+      LangGraph Agent
+            │
+            ▼
+        Final Response
 
+Features
+Customer authentication before AI interaction
+Customer context maintained throughout the conversation
+Product search using backend APIs
+Tool calling using LangChain Tools
+LangGraph workflow orchestration
+Ollama-hosted Llama 3.1 model
+Automatic graph visualization
+Stateful conversation
 
 3) Tech Stack
 - FastAPI
@@ -26,6 +67,10 @@ In scope
 - pytest for unit testing
 - pytest-mock for mocking dependencies
 - rabbitmq
+- LangGraph
+- LangChain
+- Ollama
+- Llama 3.1 8B
 
 4) High-Level Architecture
 The app follows a feature-folder modular structure:

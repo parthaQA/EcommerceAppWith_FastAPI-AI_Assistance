@@ -1,7 +1,9 @@
-from fastapi import APIRouter, status, Depends, UploadFile, File, Query
+from fastapi import APIRouter, status, Depends, UploadFile, File, Query, Request, HTTPException
 from sqlalchemy.orm import Session
 from watchfiles import awatch
 
+from src.customers.controller import CustomerController
+from src.customers.models import CustomerModel
 from src.products.controller import ProductController
 from src.products.dtos import ProductSchema, ProductResponseSchema
 from src.utils.db import get_db
@@ -36,3 +38,22 @@ def update_a_product_by_id(product_id: int, body: ProductSchema, db: Session= De
     return ProductController.update_a_product_by_id(product_id=product_id, body=body, db=db)
 
 
+@product_routes.get("", status_code=status.HTTP_200_OK)
+def search_product(request: Request,
+    name: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    customer_id_header = request.headers.get("customer_id")
+    customer_exists = db.query(CustomerModel).filter(CustomerModel.id == customer_id_header).first()
+    if not customer_exists:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    customer_authenticated = CustomerController.is_authenticated(request)
+
+    if customer_authenticated["message"] != "Authenticated":
+        return {
+            "success": False,
+            "data": [],
+            "message": "Customer not authenticated"
+        }
+    return ProductController.search_product_by_name(name=name, db=db)
