@@ -1,12 +1,12 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, Request
-from src.cart.dtos import CartResponseSchema, CartItemSchema, DeliveryAddressSchema, ProductResponseSchema, CartProductsResponseSchema, CartProductSchema
+from src.cart.dtos import CartItemSchema, DeliveryAddressSchema, ProductResponseSchema, CartProductsResponseSchema, \
+    CartProductSchema, CartResponseSchema
 from src.cart.models import CartModel, CartItemModel, DeliveryAddressModel
-from src.utils.helper import Helper
 from src.customers.controller import CustomerController
 from src.customers.models import CustomerModel
 from src.products.models import ProductModel
-
+from src.utils.helper import Helper
 
 
 class CartController:
@@ -27,7 +27,7 @@ class CartController:
                 "message": "Customer not authenticated"
             }
         cart_id = Helper.generate_cart_id()
-        cart=CartModel(cart_id=cart_id, location=location, customer_id=customer_id_header)
+        cart = CartModel(cart_id=cart_id, location=location, customer_id=customer_id_header)
         db.add(cart)
         db.commit()
         db.refresh(cart)
@@ -35,9 +35,9 @@ class CartController:
         return {
             "success": True,
             "data": CartResponseSchema(cart_id=cart.cart_id, location=cart.location, created_date=cart.created_date,
-            modified_date=cart.modified_date),
+                                       modified_date=cart.modified_date),
             "message": "Cart retrieved successfully"
-            }
+        }
 
     
     @staticmethod
@@ -155,4 +155,38 @@ class CartController:
             "success": True,
             "data": delivery_address,
             "message": "Delivery address added successfully"
-        }   
+        }
+
+
+    @staticmethod
+    def get_cart_for_checkout(cart_id, db: Session):
+
+        is_cart_exists = db.query(CartModel).filter(CartModel.cart_id == cart_id).first()
+        if not is_cart_exists:
+            raise HTTPException(status_code=404, detail="cart id not found")
+
+        results = (
+            db.query(CartItemModel, ProductModel)
+            .join(
+                ProductModel,
+                CartItemModel.product_id == ProductModel.product_id
+            )
+            .filter(CartItemModel.cart_id == cart_id)
+            .all()
+        )
+
+        cart_products = []
+
+        for cart_item, product in results:
+            cart_products.append({
+                "product_id": product.product_id,
+                "product_name": product.product_name,
+                "product_description": product.product_description,
+                "product_price": product.product_price,
+                "product_quantity": cart_item.quantity,
+                "product_image_url": product.product_image_url
+            })
+
+        return {
+            "data": cart_products
+        }

@@ -2,9 +2,11 @@ from pydantic import BaseModel
 
 
 class ProductResponse(BaseModel):
+    product_id: int
     name: str
     price: float
     available: bool
+    quantity: int
 
 
 class SearchResponse(BaseModel):

@@ -12,4 +12,11 @@ langchain
 langchain-core
 langchain-community
 ipython
+langgraph-checkpoint-postgres
+psycopg-binary
+langchain_openai
+nemoguardrails
+langchain-groq
+
 ##fastapi dev main.py --reload
+##streamlit run src\streamlit_ai\streamlit_app.py

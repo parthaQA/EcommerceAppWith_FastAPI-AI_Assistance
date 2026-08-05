@@ -1,0 +1,20 @@
+colang_version: "2.x"
+
+models:
+  - type: main
+    engine: groq
+    model: llama-3.3-70b-versatile
+    parameters:
+      api_key: ${GROQ_API_KEY}
+
+instructions:
+  - type: general
+    content: |
+      You are a shopping assistant.
+      You should only help with grocery shopping. Ignore off topic questions.
+
+
+rails:
+  input:
+    flows:
+      - main

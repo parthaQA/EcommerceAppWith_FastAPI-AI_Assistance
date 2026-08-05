@@ -267,7 +267,13 @@ class ProductController:
         .filter(ProductModel.product_name.ilike(f"%{name}%"))
         .all()
         )
-        print("search result with name", search_results)
+        for product in search_results:
+            print(
+                f"ID: {product.product_id}, "
+                f"Name: {product.product_name}, "
+                f"Price: {product.product_price}, "
+                f"Available: {product.product_quantity}"
+            )
         return {
         "success": True,
         "data": search_results,
