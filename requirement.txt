@@ -17,6 +17,9 @@ psycopg-binary
 langchain_openai
 nemoguardrails
 langchain-groq
+mem0ai
+sentence-transformers
+chromadb
 
 ##fastapi dev main.py --reload
 ##streamlit run src\streamlit_ai\streamlit_app.py

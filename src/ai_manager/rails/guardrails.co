@@ -5,21 +5,9 @@ import llm
 
 flow main
   activate llm continuation
-  activate shopping fallback
-  activate reminder_flow
+  activate off topic detection
 
 
-flow shopping fallback
-
-    while True
-        when unhandled user intent
-            bot say "I am an shopping assistant.How can I assist you today?"
-
-
-flow reminder_flow
-
-    while True
-
-        when user was silent 12.0
-
-            bot say "Are you still there? I can help you search products, compare prices, or manage your cart."
+flow off topic detection
+    user intent is off topic
+    bot say "[OFF_TOPIC] I can only help with shopping-related questions, such as finding products, checking prices, or managing your cart."

@@ -103,29 +103,16 @@ class MetricCallBacks(BaseCallbackHandler):
 
         total_cost = input_cost + output_cost
 
+        total_token = ai_message.usage_metadata["input_tokens"] + ai_message.usage_metadata["output_tokens"]
+
+        print("total_token: ", total_token)
+
+        print("=" * 60)
+
         print("total cost:", total_cost)
 
         print(f"LLM Finished in {duration:.2f} seconds")
 
-
-    def on_llm_new_token(
-        self,
-        token: str | list[str | dict[str, Any]],
-        *,
-        chunk: GenerationChunk | ChatGenerationChunk | None = None,
-        run_id: UUID,
-        parent_run_id: UUID | None = None,
-        tags: list[str] | None = None,
-        **kwargs: Any,
-    ) -> Any:
-
-        self.generated_text += str(token)
-
-        print(f"Token :", self.generated_text, end="", flush=True)
-
-        print("-" * 40)
-
-        print("chunk info: ", chunk)
 
 
     def on_stream_event(
@@ -235,6 +222,6 @@ class MetricCallBacks(BaseCallbackHandler):
 
         print("on_chat_model_start")
 
-        print("=" * 60)
-
-        print("messages chat model: ", messages)
+        # print("=" * 60)
+        #
+        # print("messages chat model: ", messages)
