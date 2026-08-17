@@ -1,7 +1,6 @@
 import json
 import time
 from typing import Annotated, TypedDict
-
 from langsmith import traceable
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
@@ -15,32 +14,26 @@ from langchain_core.messages import (
     AIMessage,
     ToolMessage,
 )
+from langgraph.cache.memory import InMemoryCache
+from langgraph.types import CachePolicy
 
 from uuid import uuid4
 
-
 class State(TypedDict):
 
-
     messages: Annotated[list, add_messages]
-
     mobile: str
-
     location: str
-
     search_results: list[dict]
-
     cart: dict
-
     product_memory: dict
-
     cart_details: dict
-
     search_completed: bool
-
     guardrail_blocked: bool
-
     requested_product: dict
+    retrieved_context: str
+    retrieved_documents: list
+    memory_results: dict
 
 
 class GraphOrchestrator:
@@ -140,6 +133,10 @@ class GraphOrchestrator:
                  "remember", "preference", "save", "preferred", "store"]):
             return "memory_write"
 
+        elif any(word in query for word in [
+            "refund", "return", "policy", "terms and condition"]):
+            return "rag_node"
+
         print(f"route_intent {time.perf_counter() - start:.2f}s")
 
         return "general"
@@ -148,6 +145,10 @@ class GraphOrchestrator:
     def product_memory_router_node(state: State):
         product_name = state["requested_product"]
         memory = state.get("product_memory", {})
+
+        if not product_name:
+            return "memory_not_found"
+
         if product_name.lower() in memory:
             return "memory_found"
 
@@ -202,6 +203,7 @@ class GraphOrchestrator:
     @traceable
     def call_model(state: State):
 
+
         ########################################################
         # 1. Intent
         ########################################################
@@ -237,14 +239,31 @@ class GraphOrchestrator:
 
         if intent == "product_info" and matched_product:
             model = llm_chat
+
+        elif intent == "rag_node":
+            model = llm_chat
+
         else:
             model = llm_with_tools
+
+
 
         ########################################################
         # 5. Build dynamic context
         ########################################################
 
         dynamic_context = []
+
+        if state.get("retrieved_context"):
+
+            dynamic_context.append(
+                f"""
+                Relevant Policy Information:
+                {state["retrieved_context"]}
+
+                Use ONLY this information to answer policy-related questions.
+                """
+            )
 
         if state.get("search_results"):
 
@@ -281,6 +300,7 @@ class GraphOrchestrator:
                 dynamic_context.append(
                     f"""Latest Cart Details {json.dumps(state["cart_details"], indent=2)}"""
                                 )
+
 
         ########################################################
         # 6. Keep only latest human message
@@ -436,6 +456,31 @@ class GraphOrchestrator:
 
 
     @staticmethod
+    @traceable
+    def rag_node(state: State):
+
+        query = state["messages"][-1].content
+
+        vector_store = DBManager.setup_vector_store()
+
+        result = vector_store.similarity_search(
+            query=query,
+            k=3
+        )
+
+
+        retrieved_context = "\n\n".join(
+            f"[{doc.metadata.get('category', 'unknown')}] {doc.page_content}"
+            for doc in result
+        )
+
+        return {
+            "retrieved_context": retrieved_context,
+            "retrieved_documents": result,
+        }
+
+
+    @staticmethod
     def create_graph_builder():
 
         graph = StateGraph(State)
@@ -452,11 +497,13 @@ class GraphOrchestrator:
 
         graph.add_node("agent", GraphOrchestrator.call_model)
 
-        graph.add_node("tools", GraphOrchestrator.custom_tool_node)
+        graph.add_node("tools", GraphOrchestrator.custom_tool_node, cache_policy=CachePolicy(ttl=240))
 
         graph.add_node("product_not_found", GraphOrchestrator.product_not_found_node)
 
         graph.add_node("memory_write", GraphOrchestrator.memory_write_node)
+
+        graph.add_node("rag_node", GraphOrchestrator.rag_node)
 
         # -----------------------------
         # Now connect them
@@ -485,6 +532,7 @@ class GraphOrchestrator:
             "get cart details": "agent",
             "general": "agent",
             "memory_write": "memory_write",
+            "rag_node": "rag_node",
             }
         )
 
@@ -525,8 +573,15 @@ class GraphOrchestrator:
             "agent"
         )
 
+        graph.add_edge(
+            "rag_node",
+            "agent"
+        )
+        cache = InMemoryCache()
         checkpointer = DBManager.get_checkpointer()
-        graph_builder = graph.compile(checkpointer=checkpointer)
+        graph_builder = graph.compile(checkpointer=checkpointer, cache=cache)
+
+        print("in memory cache", cache._cache)
 
         return graph_builder
 

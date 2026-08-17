@@ -15,16 +15,26 @@ from uuid import uuid4
 from pathlib import Path
 from nemoguardrails import LLMRails, RailsConfig
 from langchain_groq import ChatGroq
+from langchain_core.rate_limiters import InMemoryRateLimiter
 
 
 load_dotenv()
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 
+
+groq_rate_limiter = InMemoryRateLimiter(
+    requests_per_second=0.25,  # 1 token every 4 seconds
+    check_every_n_seconds=0.05,
+    max_bucket_size=1,
+)
+
+
 guardrail_llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model="openai/gpt-oss-safeguard-20b",
     api_key=str(groq_api_key),
     temperature=0,
+    rate_limiter=groq_rate_limiter
 )
 GUARDRAILS_DIR = Path(__file__).parent / "rails"
 
@@ -53,7 +63,7 @@ login_response = asyncio.run(
 )
 
 langsmith = LangChainTracer(
-    project_name="ecom-Agent_new",
+    project_name="ecom-Agent_latest_v1",
 )
 
 config = {
@@ -95,6 +105,7 @@ print("chat config : ", config)
 # checkpointer = PostgresSaver(pool)
 #
 # checkpointer.setup()
+
 
 
 llm_chat = init_chat_model(

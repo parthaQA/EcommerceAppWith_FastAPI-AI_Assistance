@@ -20,6 +20,14 @@ langchain-groq
 mem0ai
 sentence-transformers
 chromadb
+pypdf
+langchain-classic
+unstructured
+unstructured[pdf]
+sentence-transformers
+faiss-cpu
+langchain_postgres
+langchain_huggingface
 
 ##fastapi dev main.py --reload
 ##streamlit run src\streamlit_ai\streamlit_app.py

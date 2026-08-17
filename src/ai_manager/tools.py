@@ -16,17 +16,22 @@ from langgraph.types import  Command, interrupt
 from langsmith import traceable
 
 from src.utils.helper import Helper
-
+from langgraph.runtime import Runtime
 
 class Tools:
 
+
     @staticmethod
-    def get_search_product_tool(customer_id,db: Session):
+    def get_search_product_tool(customer_id, db: Session):
+
         """Search products by name"""
 
         @tool
         @traceable
-        def search_product(name: str, state: dict) -> dict:
+        def search_product(
+                name: str,
+                state: Annotated[dict, InjectedState]
+        ) -> dict:
             """
                Search grocery products by product name.
 
@@ -45,19 +50,13 @@ class Tools:
             #
             # access_token = state["access_token"]
 
-
-
-
             print(
                 f"Customer={customer_id}"
             )
 
-
             print("name : ", name)
 
             product_details = ProductController.search_product_by_name(name, db)
-
-
 
             structured_products = [
                 {
@@ -84,7 +83,6 @@ class Tools:
                 "product_memory": memory
             }
 
-
         return search_product
 
     @staticmethod
@@ -93,15 +91,15 @@ class Tools:
         @tool
         @traceable
         def add_product_to_cart(product_name: str,
-        quantity: int = 1,  state: Annotated[dict, InjectedState] = None):
+        state: Annotated[dict, InjectedState], quantity: int = 1):
 
             """
                        add  products to cart.
 
                        Use this tool whenever the user asks:
                        - add products to cart
-                       - wan to purchase the product once llm returns
-                       response from get_search_product_tool
+                       - Check the searched product is already available in product memory
+                       - if avaiable use the products from product memory.
 
                        Returns:
                        cart details where product name, price are mentioned """
@@ -111,6 +109,8 @@ class Tools:
             location = state["location"]
 
             memory = state.get("product_memory", {})
+
+            print("memory :", memory)
 
             product = memory.get(product_name.lower())
 

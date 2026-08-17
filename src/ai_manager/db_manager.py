@@ -1,3 +1,5 @@
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_postgres import PGVector
 from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg_pool import ConnectionPool
 import os
@@ -12,6 +14,8 @@ class DBManager:
 
 
     DATABASE_URL = os.getenv("DB_CONNECTION")
+    RAG_DATABASE_URL = os.getenv("RAG_DB_URL")
+
     pool = ConnectionPool(conninfo=str(DATABASE_URL),
                               kwargs={"autocommit": True},
                               )
@@ -72,4 +76,15 @@ class DBManager:
             return None
 
 
+    @staticmethod
+    def setup_vector_store():
 
+        embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+        vectorstore = PGVector(
+            embeddings=embedding_model,
+            collection_name="refund/return policy",
+            connection=DBManager.RAG_DATABASE_URL,
+        )
+
+        return vectorstore
