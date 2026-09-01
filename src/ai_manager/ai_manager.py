@@ -63,7 +63,7 @@ login_response = asyncio.run(
 )
 
 langsmith = LangChainTracer(
-    project_name="ecom-Agent_latest_v1",
+    project_name="ecom-Agent_latest_v2",
 )
 
 config = {

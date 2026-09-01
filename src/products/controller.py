@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from src.customers.controller import CustomerController
 from src.customers.models import CustomerModel
+from src.utils.es_client import PRODUCT_INDEX, es
 from src.utils.redis import  redis_client
 
 from src.category.models import CategoryModel
@@ -262,11 +263,33 @@ class ProductController:
     @staticmethod
     def search_product_by_name(name, db):
         """when user searches for a product by name, this function will return all products that match the search term"""
-        search_results = (
-        db.query(ProductModel)
-        .filter(ProductModel.product_name.ilike(f"%{name}%"))
-        .all()
+        es_result = es.search(
+            index=PRODUCT_INDEX,
+            query={
+                "match": {
+                    "product_name": {
+                        "query": name,
+                        "fuzziness": "AUTO"
+                    }
+                }
+            },
+            size=50
         )
+
+        product_ids = [hit["_source"]["product_id"] for hit in es_result["hits"]["hits"]]
+
+        if not product_ids:
+            return {
+                "success": True,
+                "data": [],
+                "message": f"Found 0 products matching '{name}'"
+            }
+
+        # pull full rows from Postgres, preserving ES relevance order
+        products_by_id = {p.product_id: p for p in
+                          db.query(ProductModel).filter(ProductModel.product_id.in_(product_ids)).all()}
+        search_results = [products_by_id[pid] for pid in product_ids if pid in products_by_id]
+
         for product in search_results:
             print(
                 f"ID: {product.product_id}, "
@@ -274,8 +297,9 @@ class ProductController:
                 f"Price: {product.product_price}, "
                 f"Available: {product.product_quantity}"
             )
+
         return {
-        "success": True,
-        "data": search_results,
-        "message": f"Found {len(search_results)} products matching '{name}'"
+            "success": True,
+            "data": search_results,
+            "message": f"Found {len(search_results)} products matching '{name}'"
         }

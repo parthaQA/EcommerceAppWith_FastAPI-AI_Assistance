@@ -28,6 +28,44 @@ sentence-transformers
 faiss-cpu
 langchain_postgres
 langchain_huggingface
+langgraph-cli[inmem]
+elasticsearch=8.15.0
+boto3
+awscli
+cohere
+langchain-redis
+deepeval
 
 ##fastapi dev main.py --reload
-##streamlit run src\streamlit_ai\streamlit_app.py
+##python -m streamlit run src\streamlit_ai\streamlit_app.py
+
+##data ingestion pipeline and batch chunking for rag.
+## db indexing for better retrieval
+## Query rewriting, expansion, and step-back prompting - done theory and logic and practical implementation
+## Re-ranking models and context compression -  done.
+## prompt caching and response caching. - done
+## evaluation of shopping agent
+## retry strategies, fallback
+## evaluation of rag
+## retrieval metrics
+## generation metrics
+## Geval
+## Tool calls metrics
+## bias and other social metrics
+## conversationTest cases, LLMTest Cases
+## read input, expected output from doc, llm output from llm node, retrieval output
+## from rag node
+## create proper unit test evaluation pipeline.
+## prompt engineering with single shot, chain of thought and others.
+## Self-RAG and Adaptive RAG
+## add tools for add delivery address, place order
+## add api to remove product from cart
+## add tool for remove product from cart
+## add notification/webhook to notify customer order is placed.
+## add tools for getting order status.
+## add a tracker in api to check real time delivery time, status.
+## add human in the loop to give approval for place order, cancel order.
+## add api endpoint to cancel order
+## optimize ai agent and fast api code for production readiness.
+## develop websocket for agent chat.
+## production deployment with kubernetes

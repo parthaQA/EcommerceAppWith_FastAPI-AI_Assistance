@@ -5,7 +5,7 @@ from src.cart.models import CartItemModel, CartModel, DeliveryAddressModel
 from src.customers.controller import CustomerController
 from src.order.dtos import OrderSchema
 from src.order.models import OrderItemModel, OrderModel
-from src.utils.enum import OrderStatus, PaymentMode, PaymentStatus
+from src.utils.enums import OrderStatus, PaymentMode, PaymentStatus
 from sqlalchemy.orm import Session
 
 class OrderController:

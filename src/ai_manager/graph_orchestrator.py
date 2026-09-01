@@ -1,6 +1,9 @@
 import json
 import time
 from typing import Annotated, TypedDict
+
+from cohere.manually_maintained.cohere_aws import rerank
+from langchain_core.outputs import Generation
 from langsmith import traceable
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
@@ -18,6 +21,9 @@ from langgraph.cache.memory import InMemoryCache
 from langgraph.types import CachePolicy
 
 from uuid import uuid4
+
+from src.ai_manager.utils import Utils
+
 
 class State(TypedDict):
 
@@ -255,13 +261,25 @@ class GraphOrchestrator:
         dynamic_context = []
 
         if state.get("retrieved_context"):
-
             dynamic_context.append(
                 f"""
                 Relevant Policy Information:
                 {state["retrieved_context"]}
 
-                Use ONLY this information to answer policy-related questions.
+                Rules for using the above policy information:
+                - Answer ONLY using what is explicitly stated above. Do not add details,
+                  percentages, timelines, or conditions that are not written here.
+                - The text above may contain MULTIPLE, UNRELATED policy sections (e.g. one
+                  about missing items, another about general returns, another about refund
+                  tiers). Identify which single section actually matches the user's
+                  specific question, and IGNORE the other sections even if they mention
+                  similar words like "refund" or "days".
+                - Do NOT combine numbers or rules from one section with a different section.
+                  For example, refund percentage tiers under "Return & Refund Policy" apply
+                  only to standard product returns — do not apply them to missing items,
+                  damaged items, or any other scenario unless explicitly stated there too.
+                - If the matching section does not mention a refund percentage, timeline, or
+                  resolution process, say so plainly instead of inferring one from elsewhere.
                 """
             )
 
@@ -458,25 +476,78 @@ class GraphOrchestrator:
     @staticmethod
     @traceable
     def rag_node(state: State):
+        RERANK_THRESHOLD = 0.05
+        EXPECTED_SCORE = 0.2
+        embedding_model = DBManager.embedding_model.model_name
+        K = 10
+        rag_pipeline_version = Utils.get_rag_pipeline_version(
+            score_threshold= EXPECTED_SCORE,
+            rerank_threshold= RERANK_THRESHOLD,
+            k=K,
+            reranker= embedding_model)
 
         query = state["messages"][-1].content
+        rewritten_query = DBManager.rewrite_query(state["messages"])
+        cache = DBManager.get_rag_cache()
+
+        cached = cache.lookup(
+            prompt= rewritten_query,
+            llm_string= rag_pipeline_version
+        )
+        if cached:
+            cached_result = cached[0].text
+            print("RAG cache HIT — skipping vector search + rerank")
+            return {
+                "messages": [
+                    AIMessage(content=cached_result)
+                ],
+            }
+            # return {
+            #     "original_query": query,
+            #     "rewritten_query": rewritten_query,
+            #     "retrieved_context": cached_result,
+            # }
+        print("RAG cache MISS — running full retrieval pipeline")
 
         vector_store = DBManager.setup_vector_store()
 
-        result = vector_store.similarity_search(
-            query=query,
-            k=3
+        result = vector_store.similarity_search_with_relevance_scores(
+            query=rewritten_query,
+            k=K
         )
 
+        filtered = [doc for doc, score in result if score >= EXPECTED_SCORE]
+
+        rerank_doc = Utils.rerank_query_response(query=query, document=filtered)
+
+
+
+        top_results = [r for r in rerank_doc.results if r.relevance_score >= RERANK_THRESHOLD]
+
+        if not top_results:
+            top_results = rerank_doc.results[:2]
+
+        for result in rerank_doc.results:
+            print(f"Score: {result.relevance_score:.4f} | Doc: {filtered[result.index]}")
+            print("all the rerank docs :", result.document)
+            print("all the rerank docs texts :", result.document.text)
 
         retrieved_context = "\n\n".join(
-            f"[{doc.metadata.get('category', 'unknown')}] {doc.page_content}"
-            for doc in result
+            f"[{filtered[r.index].metadata.get('category', 'unknown')}] {filtered[r.index].page_content}"
+            for r in top_results
+        )
+
+        # STEP 3: Save to cache for next time
+        cache.update(
+            prompt=rewritten_query,
+            llm_string=rag_pipeline_version,
+            return_val=[Generation(text=retrieved_context)],
         )
 
         return {
+            "original_query": query,
+            "rewritten_query": rewritten_query,
             "retrieved_context": retrieved_context,
-            "retrieved_documents": result,
         }
 
 
@@ -585,3 +656,5 @@ class GraphOrchestrator:
 
         return graph_builder
 
+def get_graph():
+    return GraphOrchestrator.create_graph_builder()

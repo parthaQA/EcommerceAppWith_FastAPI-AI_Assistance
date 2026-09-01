@@ -125,33 +125,63 @@ class CustomerController:
 
     async def customer_login(self, body: CustomerLoginSchema, db: Session, request: Request):
 
-        await Helper.check_rate_limit(
-            request=request,
-            mobile=body.mobile
+        is_customer_exist = (
+            db.query(CustomerModel)
+            .filter(CustomerModel.mobile == body.mobile)
+            .first()
         )
 
-        try:
-
-            response = await self.customer_login_internal(
-                body=body,
-                db=db
+        if not is_customer_exist:
+            raise HTTPException(
+                status_code=404,
+                detail="Customer not found"
             )
 
-            await Helper.clear_login_attempt(
-                request=request,
-                mobile=body.mobile
+        is_number_exist = (
+            db.query(CustomerRegistrationModel)
+            .filter(CustomerRegistrationModel.mobile == body.mobile)
+            .first()
+        )
+
+        if not is_number_exist:
+            raise HTTPException(
+                status_code=401,
+                detail="Unauthorized"
             )
 
-            return response
-
-        except Exception:
-
-            await Helper.increment_login_attempt(
-                request=request,
-                mobile=body.mobile
+        if not Helper.verify_password(
+                body.password,
+                is_number_exist.password
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Wrong password"
             )
 
-            raise
+        exp_time = datetime.now(
+            timezone.utc
+        ) + timedelta(
+            minutes=settings.EXP_TIME
+        )
+
+        access_token = jwt.encode(
+            {
+                "customer_id": is_customer_exist.id,
+                "mobile": is_number_exist.mobile,
+                "exp": exp_time
+            },
+            settings.SECRET_KEY,
+            algorithm=settings.ALGORITHM
+        )
+
+        refresh_token = str(uuid.uuid4())
+
+        return {
+            "customer_id": is_customer_exist.id,
+            "mobile": is_number_exist.mobile,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }
 
     @staticmethod
     def is_authenticated(request: Request):
